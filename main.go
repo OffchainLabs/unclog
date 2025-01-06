@@ -43,7 +43,7 @@ func dispatch() error {
 	run := subcommands[sub]
 	if run == nil {
 		printUsage()
-		return fmt.Errorf("invalid subcommand %s", args[0])
+		return fmt.Errorf("invalid subcommand %s", sub)
 	}
 	if err := run(context.Background(), args); err != nil {
 		errExit(err)
