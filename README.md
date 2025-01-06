@@ -81,17 +81,25 @@ There are a few benefits to using separate files over other options (simple file
 - The tool supports adding as many bullet points as you want to any section you want. But don't make up sections,
   unknown sections will be treated as invalid in the github workflow check.
 
+### Installing tool from private repo
+
+Currently this repo is private, so installing the tool for ez use requires a wonky set of steps:
+```
+$ pushd /tmp && git clone git@github.com:OffchainLabs/unclog.git && pushd unclog && go install . && popd && popd
+```
+
+This will install the `unclog` binary on your gopath.
+
 ### Using the tool to make a released changelog
 
 Note: before running the tool, make sure you have tagged the release commit. The tool looks at individual PR commits
 to find all the information used in building the changelog.
 
 ```
-$ go install github.com/OffchainLabs/unclog
 $ cd $PRYSM_REPO_DIR
 $ git fetch && git checkout origin/develop
 $ git checkout -b update-changelog
-$ clog release -repo=$PRYSM_REPO_DIR -tag=$NEW_RELEASE_TAG -cleanup > $PRYSM_REPO_DIR/CHANGELOG.md
+$ unclog release -repo=$PRYSM_REPO_DIR -tag=$NEW_RELEASE_TAG -cleanup > $PRYSM_REPO_DIR/CHANGELOG.md
 $ git commit -m "updating the changelog for $NEW_RELEASE_TAG release"
 ```
 
@@ -128,7 +136,6 @@ example branch:
 $ cd $PRYSM_REPO_DIR
 $ git fetch && git checkout changelog-tool
 $ git tag changelog-test changelog-tool
-$ go install github.com/OffchainLabs/unclog
-$ clog release -repo=$PRYSM_REPO_DIR -tag=$NEW_RELEASE_TAG -cleanup > CHANGELOG.md
+$ unclog release -repo=$PRYSM_REPO_DIR -tag=$NEW_RELEASE_TAG -cleanup > CHANGELOG.md
 $ git status # or git diff, to check out the results
 ```
