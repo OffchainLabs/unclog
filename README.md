@@ -87,7 +87,7 @@ Note: before running the tool, make sure you have tagged the release commit. The
 to find all the information used in building the changelog.
 
 ```
-$ go install github.com/kasey/go-legnahc/clog # temporary home, we will move this into prysm or an ocl repo
+$ go install github.com/OffchainLabs/unclog
 $ cd $PRYSM_REPO_DIR
 $ git fetch && git checkout origin/develop
 $ git checkout -b update-changelog
@@ -128,7 +128,7 @@ example branch:
 $ cd $PRYSM_REPO_DIR
 $ git fetch && git checkout changelog-tool
 $ git tag changelog-test changelog-tool
-$ go install github.com/kasey/go-legnahc/clog # temporary home, we will move this into prysm or an ocl repo
+$ go install github.com/OffchainLabs/unclog
 $ clog release -repo=$PRYSM_REPO_DIR -tag=$NEW_RELEASE_TAG -cleanup > CHANGELOG.md
 $ git status # or git diff, to check out the results
 ```

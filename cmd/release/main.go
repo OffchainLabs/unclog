@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kasey/go-legnahc/changelog"
+	"github.com/OffchainLabs/unclog/changelog"
 )
 
 func parseArgs(args []string) (*changelog.Config, error) {

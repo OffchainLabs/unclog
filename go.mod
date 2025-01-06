@@ -1,4 +1,4 @@
-module github.com/kasey/go-legnahc
+module github.com/OffchainLabs/unclog
 
 go 1.23
 

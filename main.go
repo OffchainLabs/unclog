@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kasey/go-legnahc/clog/check"
-	"github.com/kasey/go-legnahc/clog/release"
+	"github.com/OffchainLabs/unclog/cmd/check"
+	"github.com/OffchainLabs/unclog/cmd/release"
 )
 
 var subcommands = map[string]func(context.Context, []string) error{

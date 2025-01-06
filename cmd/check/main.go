@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kasey/go-legnahc/changelog"
+	"github.com/OffchainLabs/unclog/changelog"
 )
 
 type githubConf struct {
