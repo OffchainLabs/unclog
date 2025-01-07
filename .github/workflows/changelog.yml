@@ -1,7 +1,7 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: build-unclog
+name: main-artifact-refresher
 
 on:
   pull_request:
@@ -12,45 +12,6 @@ on:
 
 jobs:
   build-changelog-check:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-
-    - name: Build
-      run: go build -o unclog -v .
-
-    - name: Upload changelog binary
-      uses: actions/upload-artifact@v3
-      with:
-        name: unclog-binary
-        path: unclog
-
-  run-changelog-check:
-    runs-on: ubuntu-latest
-    needs: build-changelog-check
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v3
-
-      - name: Download changelog check binary
-        uses: actions/download-artifact@v3
-        with:
-          name: unclog-binary
-
-      - name: Get new changelog files
-        id: new-changelog-files
-        uses: tj-actions/changed-files@v45
-        with:
-          files: |
-            log/**.md
-
-      - name: Run lint command
-        env:
-          ALL_ADDED_MARKDOWN: ${{ steps.new-changelog-files.outputs.added_files }}
-        run: chmod +x unclog && ./unclog check -fragment-env=ALL_ADDED_MARKDOWN
+    uses: ./.github/workflows/build-unclog.yml
+    with:
+      artifact-name: unclog
