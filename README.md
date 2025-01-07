@@ -1,4 +1,4 @@
-## Changelog generation tool
+## unclog the changelog
 
 The purpose of this tool is to enable a more automated changelog management workflow built around
 a directory of changelog "fragments", which can be independently added in PRs and merged together
