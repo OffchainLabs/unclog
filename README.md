@@ -4,7 +4,7 @@ The purpose of this tool is to enable a more automated changelog management work
 a directory of changelog "fragments", which can be independently added in PRs and merged together
 into the previous changelog at release time.
 
-The repo also demonstrates using a github action together with the `changelog check` subcommand 
+The repo also demonstrates using a github action together with the `unclog check` subcommand 
 to automate ensuring that all PRs include a changelog fragment. 
 
 #### What is a changelog fragment?
