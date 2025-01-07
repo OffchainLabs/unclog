@@ -1,11 +1,14 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: changelog-check
+name: build-unclog
 
 on:
   pull_request:
-    branches: [ "main" ]
+    types:
+      - closed
+  schedule:
+    - cron: "0 0 1 * *" # run at least monthly due to 90 day artifact retention
 
 jobs:
   build-changelog-check:
@@ -21,10 +24,10 @@ jobs:
     - name: Build
       run: go build -o unclog -v .
 
-    - name: Upload linter binary
+    - name: Upload changelog binary
       uses: actions/upload-artifact@v3
       with:
-        name: changelog-check-binary
+        name: unclog-binary
         path: unclog
 
   run-changelog-check:
@@ -38,7 +41,7 @@ jobs:
       - name: Download changelog check binary
         uses: actions/download-artifact@v3
         with:
-          name: changelog-check-binary
+          name: unclog-binary
 
       - name: Get new changelog files
         id: new-changelog-files
