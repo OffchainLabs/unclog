@@ -38,7 +38,7 @@ When the `Ignored` section is used, the bullet point should be a reason that thi
 from the changelog.
 
 The fragment files can contain one section or multiple sections, and each section can have 1 or more bullet points.
-For example, [here](/clog/release/testdata/example-single.md) is a fragment file for a typical change,
+For example, [here](/unclog/release/testdata/example-single.md) is a fragment file for a typical change,
 with just one bullet added to the `Fixed` section:
 
 ```
@@ -47,7 +47,7 @@ with just one bullet added to the `Fixed` section:
 - Example of a single changelog entry.
 ```
 
-[Here](clog/release/testdata/example-multi.md) is an example fragment file for a change, where one or more bullets
+[Here](unclog/release/testdata/example-multi.md) is an example fragment file for a change, where one or more bullets
 have been added to multiple sections:
 
 ```
