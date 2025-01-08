@@ -25,8 +25,10 @@ runs:
   - name: Default binary name
     if: ${{ inputs.artifact-name != '' }}
     shell: bash
+    env:
+      UNCLOG_BINARY_NAME: ${{ inputs.artifact-name }}
     run: |
-      echo "UNCLOG_BINARY_NAME={{ $inputs.artifact-name }}" >> ${GITHUB_ENV}
+      echo "UNCLOG_BINARY_NAME=${UNCLOG_BINARY_NAME}" >> ${GITHUB_ENV}
 
   - name: Scoped name in PR
     if: ${{ inputs.artifact-name == '' && github.event_name == 'pull_request' }}
