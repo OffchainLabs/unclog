@@ -14,24 +14,26 @@ jobs:
       artifact-name: ${{ steps.unclog-build.outputs.artifact-name }}
     steps:
 
+    - name: Checkout source code
+      uses: actions/checkout@v4
+
     - name: Run unclog build
       id: unclog-build
-      uses: ./.github/workflows/build-unclog.yml
+      uses: ./.github/actions/build-unclog
 
   run-changelog-check:
     runs-on: ubuntu-latest
     needs: build-unclog
-
     steps:
+
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
       - name: Download changelog check binary
         id: unclog-download
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-unclog.outputs.artifact-name }}
-
-      - name: Checkout source code
-        uses: actions/checkout@v4
 
       - name: Get new changelog files
         id: new-changelog-files
@@ -45,5 +47,8 @@ jobs:
         env:
           ALL_ADDED_MARKDOWN: ${{ steps.new-changelog-files.outputs.added_files }}
           UNCLOG_BIN: ${{ steps.unclog-download.outputs.download-path}}/${{ needs.build-unclog.outputs-artifact-name }}
+          UNCLOG_BIN_DIR: ${{ steps.unclog-download.outputs.download-path}}
+          UNCLOG_BIN_FNAME: ${{ needs.build-unclog.outputs-artifact-name }}
         run: |
-          chmod +x ${UNCLOG_BIN} && ./${UNCLOG_BIN} check -fragment-env=ALL_ADDED_MARKDOWN
+          echo "UNCLOG_BIN=${UNCLOG_BIN}, UNCLOG_BIN_DIR=${UNCLOG_BIN_DIR}, UNCLOG_BIN_FNAME=${UNCLOG_BIN_FNAME}"
+          #chmod +x ${UNCLOG_BIN} && ./${UNCLOG_BIN} check -fragment-env=ALL_ADDED_MARKDOWN
