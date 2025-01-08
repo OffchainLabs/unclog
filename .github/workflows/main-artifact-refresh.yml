@@ -1,0 +1,21 @@
+name: main-artifact-refresh
+description: "ensures there is always an unclog artifact available, building monthly (less than 90 day retention period) or when PRs merge to main"
+
+on:
+  pull_request:
+    types:
+      - closed
+  schedule:
+    - cron: "0 0 1 * *" # run first day of month
+
+jobs:
+  refresh-unclog-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: build-unclog
+        uses: ./.github/actions/build-unclog
+        with:
+          artifact-name: unclog # This is the 'release' artifact name

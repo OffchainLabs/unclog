@@ -1,44 +1,28 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: changelog-check
+name: dogfood
 
 on:
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  build-changelog-check:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-
-    - name: Build
-      run: go build -o unclog -v .
-
-    - name: Upload linter binary
-      uses: actions/upload-artifact@v3
-      with:
-        name: changelog-check-binary
-        path: unclog
-
   run-changelog-check:
     runs-on: ubuntu-latest
-    needs: build-changelog-check
-
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: build-unclog
+        id: unclog-build
+        uses: ./.github/actions/build-unclog
 
       - name: Download changelog check binary
-        uses: actions/download-artifact@v3
+        id: unclog-download
+        uses: actions/download-artifact@v4
         with:
-          name: changelog-check-binary
+          name: ${{ steps.unclog-build.outputs.artifact-name }}
 
       - name: Get new changelog files
         id: new-changelog-files
@@ -48,6 +32,10 @@ jobs:
             log/**.md
 
       - name: Run lint command
+        shell: bash
         env:
           ALL_ADDED_MARKDOWN: ${{ steps.new-changelog-files.outputs.added_files }}
-        run: chmod +x unclog && ./unclog check -fragment-env=ALL_ADDED_MARKDOWN
+          #UNCLOG_BIN: ${{ steps.unclog-download.outputs.download-path}}/${{ steps.unclog-build.outputs.artifact-name }}
+          #UNCLOG_DIR: ${{ steps.unclog-download.outputs.download-path}}
+        run: |
+          chmod +x unclog && ./unclog check -fragment-env=ALL_ADDED_MARKDOWN

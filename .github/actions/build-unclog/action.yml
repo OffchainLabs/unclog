@@ -1,0 +1,52 @@
+name: build-unclog
+description: builds the unclog binary from source
+
+inputs:
+  artifact-name:
+    required: false
+    type: string
+outputs:
+  artifact-name:
+    description: "name of uploaded artifact"
+    value: ${{ steps.artifact-namer.outputs.artifact-name }}
+
+runs:
+  using: "composite"
+  steps:
+  - name: Set up Go
+    uses: actions/setup-go@v5
+    with:
+      go-version: '1.22'
+
+  - name: Build
+    shell: bash
+    run: go build -o unclog -v .
+
+  - name: Default binary name
+    if: ${{ inputs.artifact-name != '' }}
+    shell: bash
+    run: |
+      echo "UNCLOG_BINARY_NAME={{ $inputs.artifact-name }}" >> ${GITHUB_ENV}
+
+  - name: Scoped name in PR
+    if: ${{ inputs.artifact-name == '' && github.event_name == 'pull_request' }}
+    shell: bash
+    run: |
+      echo "UNCLOG_BINARY_NAME=unclog-${{ github.event.pull_request.head.sha }}" >> ${GITHUB_ENV}
+  - name: Scoped name on push
+    if: ${{ inputs.artifact-name == '' && github.event_name == 'push' }}
+    shell: bash
+    run: |
+      echo "UNCLOG_BINARY_NAME=unclog-${GITHUB_SHA}" >> ${GITHUB_ENV}
+
+  - name: Set artifact-name output parameter
+    id: artifact-namer
+    shell: bash
+    run: |
+      echo "artifact-name=${UNCLOG_BINARY_NAME}" >> "$GITHUB_OUTPUT"
+
+  - name: Upload unclog binary
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ steps.artifact-namer.outputs.artifact-name }}
+      path: unclog
