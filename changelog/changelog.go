@@ -48,6 +48,7 @@ type Config struct {
 	Cleanup      bool
 	Branch       string
 	ReleaseTime  time.Time
+	OutputPath   string
 }
 
 func (c *Config) Repo() (*git.Repository, error) {
