@@ -1,4 +1,4 @@
-name: build-main
+name: release
 description: "automatically build unclog releases"
 
 on:
@@ -7,7 +7,7 @@ on:
       - "v*.*.*"
 
 jobs:
-  refresh-unclog-binary:
+  release-unclog:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
