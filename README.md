@@ -81,11 +81,11 @@ There are a few benefits to using separate files over other options (simple file
 - The tool supports adding as many bullet points as you want to any section you want. But don't make up sections,
   unknown sections will be treated as invalid in the github workflow check.
 
-### Installing tool from private repo
+### Installation
 
-Currently this repo is private, so installing the tool for ez use requires a wonky set of steps:
+This repo is designed so that `unclog` can be simply installed with `go install`:
 ```
-$ pushd /tmp && git clone git@github.com:OffchainLabs/unclog.git && pushd unclog && go install . && popd && popd
+$ go install OffchainLabs/unclog@latest
 ```
 
 This will install the `unclog` binary on your gopath.
