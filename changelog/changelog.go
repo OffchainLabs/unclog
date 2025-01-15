@@ -15,7 +15,7 @@ import (
 )
 
 var versionRE = regexp.MustCompile(`^#+ \[(v\d+\.\d+\.\d+)\]`)
-var sectionRE = regexp.MustCompile(`^### (\w+)\s?$`)
+var sectionRE = regexp.MustCompile(`^#{1,6} (\w+)\s?$`)
 
 const preamble = `# Changelog
 
@@ -242,6 +242,10 @@ func ParseFragment(lines []string, pr string) map[string][]string {
 			current = section
 			continue
 		}
+		// We don't have a way to categorize a bullet found outside a known section.
+		if current == "" {
+			continue
+		}
 		bullet := parseBullet(line, pr)
 		if bullet == "" {
 			continue
@@ -266,7 +270,7 @@ func ValidSections(sections map[string][]string) error {
 			if k == sectionIgnored {
 				continue
 			}
-			return fmt.Errorf("invalid section name: %s", k)
+			return fmt.Errorf("invalid section name in fragment: %s", k)
 		}
 	}
 	return nil
