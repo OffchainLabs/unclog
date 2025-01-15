@@ -15,7 +15,7 @@ import (
 )
 
 var versionRE = regexp.MustCompile(`^#+ \[(v\d+\.\d+\.\d+)\]`)
-var sectionRE = regexp.MustCompile(`^### (\w+)\s?$`)
+var sectionRE = regexp.MustCompile(`^#{1,6} (\w+)\s?$`)
 
 const preamble = `# Changelog
 

@@ -16,3 +16,24 @@ func TestParseBulletOverride(t *testing.T) {
 		t.Error("parseBullet did not recognize the override")
 	}
 }
+
+func TestSectionRe(t *testing.T) {
+	cases := []struct {
+		value string
+		valid bool
+	}{
+		{value: "####### Fixes", valid: false}, // there's no H7
+		{value: " Fixes", valid: false},
+		{value: "# Fixes", valid: true},
+		{value: "## Fixes", valid: true},
+		{value: "### Fixes", valid: true},
+		{value: "#### Fixes", valid: true},
+		{value: "##### Fixes", valid: true},
+		{value: "###### Fixes", valid: true},
+	}
+	for _, c := range cases {
+		if valid := sectionRE.MatchString(c.value); valid != c.valid {
+			t.Errorf("sectionRE failed to match %v", c)
+		}
+	}
+}
