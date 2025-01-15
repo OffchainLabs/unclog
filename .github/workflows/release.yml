@@ -13,11 +13,6 @@ jobs:
     - name: Checkout source code
       uses: actions/checkout@v4
 
-    - name: build-unclog
-      uses: ./.github/actions/build-unclog
-      with:
-        artifact-name: unclog # This is the 'release' artifact name
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
