@@ -16,9 +16,20 @@ type githubConf struct {
 	FragmentListingEnv string // name of env var containing a list of file fragments
 }
 
-func parseArgs(args []string) (*changelog.Config, *githubConf, error) {
+func parseArgs(args []string) (c *changelog.Config, envConf *githubConf, err error) {
 	flags := flag.NewFlagSet("check", flag.ContinueOnError)
-	c := &changelog.Config{RepoConfig: changelog.RepoConfig{Owner: "prysmaticlabs", Repo: "prysm"}, ReleaseTime: time.Now()}
+	flags.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		flags.PrintDefaults()
+		fmt.Fprint(flag.CommandLine.Output(), "\n")
+	}
+	defer func() {
+		if err != nil {
+			flags.Usage()
+		}
+	}()
+
+	c = &changelog.Config{RepoConfig: changelog.RepoConfig{Owner: "prysmaticlabs", Repo: "prysm"}, ReleaseTime: time.Now()}
 	flags.StringVar(&c.RepoPath, "repo", "", "Path to the git repository")
 	flags.StringVar(&c.ChangesDir, "changelog-dir", "changelog", "Path to the directory containing changelog fragments for each commit")
 	flags.StringVar(&c.RepoConfig.MainRev, "main-rev", "origin/develop", "Main branch tip revision")
@@ -26,12 +37,19 @@ func parseArgs(args []string) (*changelog.Config, *githubConf, error) {
 	envCfg := &githubConf{}
 	flags.StringVar(&envCfg.FragmentListingEnv, "fragment-env", "", "Name of the environment variable containing a list of changelog fragments")
 	flags.Parse(args)
+	if c.RepoPath == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return nil, envCfg, fmt.Errorf("repo flag not set and can't get working directory from syscall, %w", err)
+		}
+		c.RepoPath = wd
+	}
 	if envCfg.FragmentListingEnv != "" {
 		return nil, envCfg, nil
 	}
 
 	if c.RepoPath == "" {
-		return c, nil, fmt.Errorf("repo is required")
+		return c, nil, fmt.Errorf("-repo flag is required")
 	}
 	return c, nil, nil
 }
