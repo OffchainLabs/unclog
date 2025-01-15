@@ -93,6 +93,9 @@ func checkFragments(envCfg *githubConf) error {
 		}
 		lines := strings.Split(string(b), "\n")
 		parsed := changelog.ParseFragment(lines, "")
+		if len(parsed) == 0 {
+			return fmt.Errorf("please check formatting of fragment file at %s, could not find any bullet points within valid sections", p)
+		}
 		for k, v := range parsed {
 			if len(v) == 0 {
 				delete(parsed, k)
