@@ -85,7 +85,7 @@ There are a few benefits to using separate files over other options (simple file
 
 This repo is designed so that `unclog` can be simply installed with `go install`:
 ```
-$ go install OffchainLabs/unclog@latest
+$ go install github.com/OffchainLabs/unclog@latest
 ```
 
 This will install the `unclog` binary on your gopath.
