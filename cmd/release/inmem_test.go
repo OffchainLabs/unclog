@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OffchainLabs/unclog/changelog"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"github.com/OffchainLabs/unclog/changelog"
 )
 
 func requireNoError(t *testing.T, err error) {
@@ -57,12 +57,29 @@ func commitAddTag(t *testing.T, repo *git.Repository, fp string, prNum int, ctim
 	}
 }
 
+// deleteFileFromRepo simulates a PR which cleanly reverted another PR while using a changelog fragment in the "ignored" section.
+func deleteFileFromRepo(t *testing.T, repo *git.Repository, fname string, ctime time.Time, prNum int, tag string) {
+	clp := path.Join("changelog", fname)
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	requireNoError(t, tree.Filesystem.Remove(clp))
+	_, err = tree.Remove(clp)
+	requireNoError(t, err)
+	copyFileToRepo(t, repo, "ignored.md", ctime, prNum, tag)
+}
+
 func TestExamples(t *testing.T) {
 	repo, cfg, prevTime, prNum := setupTestRepo(t)
 	prNum++
 	copyFileToRepo(t, repo, "example-single.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "")
 	prNum++
 	copyFileToRepo(t, repo, "example-multi.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "")
+	// Start: a scenario where a PR was merged, but later reverted.
+	prNum++
+	copyFileToRepo(t, repo, "example-single-deleted.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "")
+	prNum++
+	deleteFileFromRepo(t, repo, "example-single-deleted.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "")
+	// End: a scenario where a PR was merged, but later reverted.
 	var last plumbing.Hash
 	_, err := repo.CreateTag(cfg.Tag, last, nil)
 	requireNoError(t, err)
@@ -95,6 +112,7 @@ func setupTestRepo(t *testing.T) (*git.Repository, *changelog.Config, time.Time,
 		Tag:          "v1.0.1",
 		PreviousPath: "changelog/previous.md",
 		RepoConfig:   changelog.RepoConfig{Owner: "prysmaticlabs", Repo: "prysm"},
+		Cleanup:      true,
 	}
 	return repo, cfg, prevTime, prNum
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"path"
 	"regexp"
 	"strconv"
@@ -145,7 +146,8 @@ func cleanupFragments(cfg *Config, fragments []Fragment) error {
 	}
 	for _, f := range fragments {
 		if err := tree.Filesystem.Remove(path.Join(cfg.ChangesDir, f.Path)); err != nil {
-			return fmt.Errorf("could not remove changelog fragment %s: %w", f.Path, err)
+			// A changelog fragment might have been removed already and that's OK. This happens when a PR is reverted.
+			log.Printf("Skipping fragment: could not remove changelog fragment %s: %v", f.Path, err)
 		}
 	}
 	return nil
