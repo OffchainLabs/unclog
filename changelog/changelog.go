@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/utils/merkletrie"
 )
 
 var versionRE = regexp.MustCompile(`^#+ \[(v\d+\.\d+\.\d+)\]`)
@@ -130,6 +133,7 @@ func mergeEntries(fragments []Fragment) map[string][]string {
 	*/
 }
 
+// Finds all fragments in a list of commits, except for fragments that are deleted by child commits.
 func findFragments(dir string, commits []Commit) ([]Fragment, error) {
 	fragments := make([]Fragment, 0)
 	for _, cm := range commits {
@@ -147,7 +151,57 @@ func findFragments(dir string, commits []Commit) ([]Fragment, error) {
 		}
 		fragments = append(fragments, f)
 	}
-	return fragments, nil
+
+	filtered := make([]Fragment, 0, len(fragments))
+	deleted := make(map[string]interface{})
+	for i := len(commits) - 1; i >= 0; i-- {
+		files, err := findDeletedFiles(dir, commits[i])
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			deleted[filepath.Base(f)] = true
+		}
+	}
+	for _, cf := range fragments {
+		if deleted[cf.Path] == nil {
+			filtered = append(filtered, cf)
+		}
+	}
+
+	return filtered, nil
+}
+
+// findDeletedFiles returns a list of filepaths deleted in the given directory.
+func findDeletedFiles(dir string, c Commit) ([]string, error) {
+	p, err := c.Parent()
+	if err != nil {
+		return nil, err
+	}
+	pt, err := p.gc.Tree()
+	if err != nil {
+		return nil, err
+	}
+
+	ct, err := c.gc.Tree()
+	if err != nil {
+		return nil, err
+	}
+
+	changes, err := object.DiffTreeWithOptions(context.Background(), pt, ct, object.DefaultDiffTreeOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	deleted := make([]string, 0)
+	for _, chg := range changes {
+		a, err := chg.Action()
+		if err == nil && a == merkletrie.Delete {
+			deleted = append(deleted, chg.From.Name)
+		}
+	}
+
+	return deleted, nil
 }
 
 func Release(ctx context.Context, cfg *Config) (string, error) {
