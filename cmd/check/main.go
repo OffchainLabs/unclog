@@ -82,7 +82,7 @@ func checkFragments(envCfg *githubConf) error {
 	if listBlob == "" {
 		return fmt.Errorf("no fragments found in env var %s", envCfg.FragmentListingEnv)
 	}
-	filePaths := strings.Split(listBlob, "\n")
+	filePaths := strings.Fields(listBlob)
 	if len(filePaths) == 0 {
 		return fmt.Errorf("no fragments found in env var %s", envCfg.FragmentListingEnv)
 	}
