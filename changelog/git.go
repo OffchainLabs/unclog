@@ -43,7 +43,7 @@ func (c Commit) prLink() string {
 }
 
 func (c Commit) prURL() string {
-	return "https://github.com/prysmaticlabs/prysm/pull/" + strconv.Itoa(c.pr)
+	return "https://github.com/OffchainLabs/prysm/pull/" + strconv.Itoa(c.pr)
 }
 
 func tagTimestamp(r *git.Repository, tag string) (time.Time, error) {

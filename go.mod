@@ -1,8 +1,6 @@
 module github.com/OffchainLabs/unclog
 
-go 1.22
-
-toolchain go1.22.4
+go 1.23
 
 require (
 	github.com/go-git/go-git/v5 v5.12.0

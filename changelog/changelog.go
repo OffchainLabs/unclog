@@ -250,7 +250,7 @@ func formatSection(name string, bullets []string) string {
 }
 
 func header(cfg *Config) string {
-	// ## [v5.1.1](https://github.com/prysmaticlabs/prysm/compare/v5.1.0...v5.1.1) - 2024-10-15
+	// ## [v5.1.1](https://github.com/OffchainLabs/prysm/compare/v5.1.0...v5.1.1) - 2024-10-15
 	return fmt.Sprintf("## [%s](https://github.com/%s/%s/compare/%s...%s) - %s",
 		cfg.Tag,
 		cfg.RepoConfig.Owner, cfg.RepoConfig.Repo,

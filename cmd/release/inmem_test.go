@@ -111,7 +111,7 @@ func setupTestRepo(t *testing.T) (*git.Repository, *changelog.Config, time.Time,
 		ChangesDir:   "changelog",
 		Tag:          "v1.0.1",
 		PreviousPath: "changelog/previous.md",
-		RepoConfig:   changelog.RepoConfig{Owner: "prysmaticlabs", Repo: "prysm"},
+		RepoConfig:   changelog.RepoConfig{Owner: "OffchainLabs", Repo: "prysm"},
 		Cleanup:      true,
 	}
 	return repo, cfg, prevTime, prNum
