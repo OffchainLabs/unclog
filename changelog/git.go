@@ -38,12 +38,8 @@ func (c Commit) Parent() (Commit, error) {
 	return Commit{gc: p}, nil
 }
 
-func (c Commit) prLink() string {
-	return "[[PR]](" + c.prURL() + ")"
-}
-
-func (c Commit) prURL() string {
-	return "https://github.com/OffchainLabs/prysm/pull/" + strconv.Itoa(c.pr)
+func (c Commit) prLink(repo *RepoConfig) string {
+	return "[[PR]](" + repo.PrURL(c.pr) + ")"
 }
 
 func tagTimestamp(r *git.Repository, tag string) (time.Time, error) {
@@ -80,7 +76,7 @@ func commitsAfter(cfg *Config) ([]Commit, error) {
 	if err != nil {
 		return nil, err
 	}
-	// We want to filter out the previous release commti, and the Since filter is inclusive,
+	// We want to filter out the previous release commit, and the Since filter is inclusive,
 	// so we increment it by the smallest amount.
 	since = since.Add(time.Nanosecond)
 	from, err := r.Tag(cfg.Tag)

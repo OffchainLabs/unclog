@@ -9,6 +9,7 @@ import (
 	"log"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +39,10 @@ type RepoConfig struct {
 	Owner   string `json:"owner"`
 	Repo    string `json:"repo"`
 	MainRev string `json:"main_rev"`
+}
+
+func (c *RepoConfig) PrURL(pr int) string {
+	return "https://github.com/" + c.Owner + "/" + c.Repo + "/pull/" + strconv.Itoa(pr)
 }
 
 type Config struct {
@@ -105,10 +110,10 @@ func NewPreviousChangelog(r io.Reader) (Previous, error) {
 // Each commit's changelog file can have entries in different sections, indicated by
 // the same section headers as the final changelog.
 // Merge all changelog bullet points into their respective sections.
-func mergeEntries(fragments []Fragment) map[string][]string {
+func mergeEntries(fragments []Fragment, repo *RepoConfig) map[string][]string {
 	sections := make(map[string][]string)
 	for _, f := range fragments {
-		pr := f.Commit.prLink()
+		pr := f.Commit.prLink(repo)
 		csecs := ParseFragment(f.Lines, pr)
 		for k, v := range csecs {
 			sections[k] = append(sections[k], v...)
@@ -224,7 +229,7 @@ func Release(ctx context.Context, cfg *Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sections := mergeEntries(fragments)
+	sections := mergeEntries(fragments, &cfg.RepoConfig)
 	if cfg.Cleanup {
 		if err := cleanupFragments(cfg, fragments); err != nil {
 			return "", err
