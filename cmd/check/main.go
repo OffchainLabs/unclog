@@ -47,7 +47,7 @@ func parseArgs(args []string) (c *changelog.Config, envConf *githubConf, err err
 		c.RepoPath = wd
 	}
 	if envCfg.FragmentListingEnv != "" {
-		return nil, envCfg, nil
+		return c, envCfg, nil
 	}
 
 	if c.RepoPath == "" {
@@ -61,8 +61,21 @@ func Run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Determine valid sections (Try loading .unclog.yaml, fallback to default)
+	activeSections := changelog.Sections
+	fileCfg, err := changelog.LoadConfig(cfg.RepoPath)
+	if err == nil && fileCfg != nil && len(fileCfg.Sections) > 0 {
+		activeSections = fileCfg.Sections
+	}
+
+	validMap := make(map[string]bool)
+	for _, s := range activeSections {
+		validMap[s] = true
+	}
+
 	if envCfg != nil {
-		return checkFragments(envCfg)
+		return checkFragments(envCfg, validMap)
 	}
 	parent, commits, err := changelog.BranchCommits(cfg, cfg.RepoConfig.MainRev, cfg.Branch)
 	if err != nil {
@@ -79,7 +92,7 @@ func Run(ctx context.Context, args []string) error {
 	return nil
 }
 
-func checkFragments(envCfg *githubConf) error {
+func checkFragments(envCfg *githubConf, validSections map[string]bool) error {
 	listBlob := os.Getenv(envCfg.FragmentListingEnv)
 	if listBlob == "" {
 		return fmt.Errorf("no fragments found in env var %s", envCfg.FragmentListingEnv)
@@ -103,7 +116,7 @@ func checkFragments(envCfg *githubConf) error {
 				delete(parsed, k)
 			}
 		}
-		if err := changelog.ValidSections(parsed); err != nil {
+		if err := changelog.ValidSections(parsed, validSections); err != nil {
 			return fmt.Errorf("fragment %s is invalid: %w", p, err)
 		}
 	}

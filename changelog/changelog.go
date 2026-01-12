@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/utils/merkletrie"
+	"gopkg.in/yaml.v3"
 )
 
 var versionRE = regexp.MustCompile(`^#+ \[(v\d+\.\d+\.\d+)\]`)
@@ -45,6 +48,11 @@ func (c *RepoConfig) PrURL(pr int) string {
 	return "https://github.com/" + c.Owner + "/" + c.Repo + "/pull/" + strconv.Itoa(pr)
 }
 
+// UnclogConfig represents the structure of the .unclog.yaml file
+type UnclogConfig struct {
+	Sections []string `yaml:"sections"`
+}
+
 type Config struct {
 	RepoPath     string
 	Repository   *git.Repository
@@ -57,6 +65,9 @@ type Config struct {
 	Branch       string
 	ReleaseTime  time.Time
 	OutputPath   string
+	// Sections allows overriding the default changelog sections.
+	// If empty, the default global Sections list is used.
+	Sections []string
 }
 
 func (c *Config) Repo() (*git.Repository, error) {
@@ -82,7 +93,7 @@ type Previous struct {
 	Body    string
 }
 
-// ParsePreviousVersionBody drops the changelog preamble and anything up to the previous release
+// NewPreviousChangelog drops the changelog preamble and anything up to the previous release
 // header containing the semver of the last release. It returns the version and the rest of the body
 // including the previous header. These values can be used together with the hardcoded preamble and
 // the new release changelog to assemble the final combined changelog.
@@ -209,6 +220,23 @@ func findDeletedFiles(dir string, c Commit) ([]string, error) {
 	return deleted, nil
 }
 
+// LoadConfig attempts to read the .unclog.yaml file from the changelog directory.
+func LoadConfig(repoPath string) (*UnclogConfig, error) {
+	configPath := filepath.Join(repoPath, "changelog", ".unclog.yaml")
+	f, err := os.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var cfg UnclogConfig
+	decoder := yaml.NewDecoder(f)
+	if err := decoder.Decode(&cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 func Release(ctx context.Context, cfg *Config) (string, error) {
 	prd, pcl, err := getFile(cfg, cfg.PreviousPath)
 	if err != nil {
@@ -220,6 +248,18 @@ func Release(ctx context.Context, cfg *Config) (string, error) {
 		return "", err
 	}
 	cfg.Previous = prev
+
+	if len(cfg.Sections) == 0 {
+		fileCfg, err := LoadConfig(cfg.RepoPath)
+		if err == nil && fileCfg != nil && len(fileCfg.Sections) > 0 {
+			cfg.Sections = fileCfg.Sections
+		}
+	}
+
+	activeSections := cfg.Sections
+	if len(activeSections) == 0 {
+		activeSections = Sections
+	}
 
 	commits, err := commitsAfter(cfg)
 	if err != nil {
@@ -236,7 +276,7 @@ func Release(ctx context.Context, cfg *Config) (string, error) {
 		}
 	}
 	body := preamble + "\n\n" + header(cfg)
-	for _, s := range Sections {
+	for _, s := range activeSections {
 		bs, ok := sections[s]
 		if !ok || len(bs) == 0 {
 			continue
@@ -273,9 +313,6 @@ func parseSection(line string) string {
 	if sec[1] == sectionIgnored {
 		return sectionIgnored
 	}
-	if _, ok := sectionNames[sec[1]]; !ok {
-		return ""
-	}
 	return sec[1]
 }
 
@@ -301,7 +338,6 @@ func ParseFragment(lines []string, pr string) map[string][]string {
 			current = section
 			continue
 		}
-		// We don't have a way to categorize a bullet found outside a known section.
 		if current == "" {
 			continue
 		}
@@ -320,17 +356,33 @@ func init() {
 	}
 }
 
-func ValidSections(sections map[string][]string) error {
+func ValidSections(sections map[string][]string, validSections map[string]bool) error {
 	if len(sections) == 0 {
-		return errors.New("no changelog sections found")
+		return errors.New("fragment contains no sections")
 	}
+
+	var invalid []string
 	for k := range sections {
-		if _, ok := sectionNames[k]; !ok {
-			if k == sectionIgnored {
-				continue
-			}
-			return fmt.Errorf("invalid section name in fragment: %s", k)
+		if k == sectionIgnored {
+			continue
+		}
+		if !validSections[k] {
+			invalid = append(invalid, k)
 		}
 	}
+
+	if len(invalid) > 0 {
+		sort.Strings(invalid)
+		var allowed []string
+		for k := range validSections {
+			allowed = append(allowed, k)
+		}
+		sort.Strings(allowed)
+
+		return fmt.Errorf("invalid changelog section(s) found: %s.\nMust be one of: %s",
+			strings.Join(invalid, ", "),
+			strings.Join(allowed, ", "))
+	}
+
 	return nil
 }
