@@ -152,6 +152,43 @@ func TestComplete(t *testing.T) {
 	}
 }
 
+// TestCustomSections verifies that we can use custom sections via configuration.
+func TestCustomSections(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+
+	cfg.Sections = []string{"Added", "Configuration"}
+
+	prNum++
+	customFrag := "### Configuration\n- Added new flag"
+	fname := "custom-config.md"
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+
+	clp := path.Join("changelog", fname)
+	fh, err := tree.Filesystem.Create(clp)
+	requireNoError(t, err)
+	fh.Write([]byte(customFrag))
+	fh.Close()
+
+	commitAddTag(t, repo, clp, prNum, prevTime.Add(time.Duration(prNum)*time.Minute), "")
+
+	var last plumbing.Hash
+	_, err = repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+
+	merged, err := changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(merged, "### Configuration") {
+		t.Error("Expected merged output to contain '### Configuration'")
+	}
+	if !strings.Contains(merged, "- Added new flag") {
+		t.Error("Expected merged output to contain the custom entry")
+	}
+}
+
 var errEnd = errors.New("end of permutation")
 
 // fixiter returns all possible sets of sections headers.

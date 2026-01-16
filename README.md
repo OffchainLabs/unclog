@@ -12,7 +12,7 @@ to automate ensuring that all PRs include a changelog fragment.
 A changelog fragment is a tiny markdown file consisting only of section headers, matching the set 
 of headers defined by the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format, followed by
 bullet points of changelog entries that should be merged into their respect sections into
-a combined release changelog. The following sections are supported:
+a combined release changelog. The following sections are supported by default:
 ```
 ### Added
 - for new features.
@@ -36,6 +36,28 @@ Note that in addition to the sections supported by "keep a changelog" we have ad
 like a bug fix for an unreleased/incomplete feature, or a PR that reverts a previously merged but unreleased PR.
 When the `Ignored` section is used, the bullet point should be a reason that this PR should be excluded
 from the changelog.
+
+### Customizing Sections
+
+You can customize the allowed sections (e.g. to add a `Configuration` section) by adding a configuration file 
+to your repository at `changelog/.unclog.yaml`.
+
+Example `changelog/.unclog.yaml`:
+```yaml
+sections:
+  - Added
+  - Changed
+  - Deprecated
+  - Removed
+  - Fixed
+  - Security
+  - Configuration
+
+```
+
+If this file is present, `unclog` will use the sections defined in the YAML file instead of the default list.
+
+### Usage
 
 The fragment files can contain one section or multiple sections, and each section can have 1 or more bullet points.
 For example, [here](/cmd/release/testdata/example-single.md) is a fragment file for a typical change,
