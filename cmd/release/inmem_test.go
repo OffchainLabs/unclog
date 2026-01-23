@@ -189,6 +189,35 @@ func TestCustomSections(t *testing.T) {
 	}
 }
 
+func TestCleanupPreservesConfigFile(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	prNum++
+
+	configPath := path.Join("changelog", ".unclog.yaml")
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	configFile, err := tree.Filesystem.Create(configPath)
+	requireNoError(t, err)
+	_, err = configFile.Write([]byte("sections:\n  - Added\n"))
+	requireNoError(t, err)
+	requireNoError(t, configFile.Close())
+
+	commitAddTag(t, repo, configPath, prNum, prevTime.Add(time.Minute), "")
+
+	var last plumbing.Hash
+	_, err = repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+
+	_, err = changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tree.Filesystem.Open(configPath); err != nil {
+		t.Fatalf("expected config file to remain after cleanup: %v", err)
+	}
+}
+
 var errEnd = errors.New("end of permutation")
 
 // fixiter returns all possible sets of sections headers.
