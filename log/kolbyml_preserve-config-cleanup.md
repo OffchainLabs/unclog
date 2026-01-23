@@ -1,2 +1,2 @@
 ### Fixed
-- Avoid removing `.unclog.yaml` during `unclog release --clean` cleanup.
+- Don't remove non .md files during `unclog release --clean` cleanup.
