@@ -173,6 +173,9 @@ func FindFragment(clDir string, parent, cm Commit) (Fragment, error) {
 			continue
 		}
 		if strings.HasPrefix(ch.To.Name, clDir) {
+			if path.Base(ch.To.Name) == unclogConfigFilename {
+				continue
+			}
 			frag.Lines, err = to.Lines()
 			frag.Path = to.Name
 			return frag, err

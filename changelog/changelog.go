@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.`
 
+const unclogConfigFilename = ".unclog.yaml"
+
 // Sections represents all the possible sections in the changelog, in the desired order.
 var Sections = []string{"Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"}
 
@@ -222,7 +224,7 @@ func findDeletedFiles(dir string, c Commit) ([]string, error) {
 
 // LoadConfig attempts to read the .unclog.yaml file from the changelog directory.
 func LoadConfig(repoPath string) (*UnclogConfig, error) {
-	configPath := filepath.Join(repoPath, "changelog", ".unclog.yaml")
+	configPath := filepath.Join(repoPath, "changelog", unclogConfigFilename)
 	f, err := os.Open(configPath)
 	if err != nil {
 		return nil, err
