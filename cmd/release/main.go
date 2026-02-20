@@ -24,7 +24,7 @@ func parseArgs(args []string) (c *changelog.Config, err error) {
 		}
 	}()
 	c = &changelog.Config{ReleaseTime: time.Now()}
-	flags.StringVar(&c.RepoConfig.Repo, "repo-owner", "OffchainLabs", "Owner of the repository (e.g., OffchainLabs)")
+	flags.StringVar(&c.RepoConfig.Owner, "repo-owner", "OffchainLabs", "Owner of the repository (e.g., OffchainLabs)")
 	flags.StringVar(&c.RepoConfig.Repo, "repo-name", "prysm", "Name of the repository (e.g., prysm)")
 	flags.StringVar(&c.RepoPath, "repo", "", "Path to the git repository")
 	flags.StringVar(&c.ChangesDir, "changelog-dir", "changelog", "Path to the directory containing changelog fragments for each commit")
