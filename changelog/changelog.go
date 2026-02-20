@@ -21,7 +21,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var versionRE = regexp.MustCompile(`^#+ \[(v\d+\.\d+\.\d+)\]`)
+// versionRE matches changelog version headers like "## [v1.2.3]" or "## [v3.10.0-rc.1](...)"
+var versionRE = regexp.MustCompile(`^#+ \[(v\d+\.\d+\.\d+[^\]]*)\]`)
 var sectionRE = regexp.MustCompile(`^#{1,6} (\w+)\s?$`)
 
 const preamble = `# Changelog
