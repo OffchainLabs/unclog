@@ -1,7 +1,6 @@
 package changelog
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -19,6 +18,7 @@ import (
 )
 
 var prCommitRE = regexp.MustCompile(`^(.*) \(#(\d+)\)$`)
+var mergeCommitRE = regexp.MustCompile(`^Merge pull request #(\d+) from .+$`)
 
 type Commit struct {
 	pr    int
@@ -83,42 +83,69 @@ func commitsAfter(cfg *Config) ([]Commit, error) {
 	if err != nil {
 		return nil, err
 	}
-	iter, err := r.Log(&git.LogOptions{Since: &since, From: from.Hash()})
+
+	hash := from.Hash()
+	if hash.IsZero() {
+		ref, err := r.Head()
+		if err != nil {
+			return nil, err
+		}
+		hash = ref.Hash()
+	}
+
+	current, err := r.CommitObject(hash)
 	if err != nil {
 		return nil, err
 	}
-	commits := make([]Commit, 0)
-	err = iter.ForEach(func(c *object.Commit) error {
-		cm, err := parseCommit(c)
+
+	var commits []Commit
+	for {
+		if current.Committer.When.Before(since) {
+			break
+		}
+		cm, err := parseCommit(current)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		commits = append(commits, cm)
-		return nil
-	})
+		parent, err := current.Parent(0)
+		if err != nil {
+			break
+		}
+		current = parent
+	}
+
 	// reverse the list
 	for i, j := 0, len(commits)-1; i < j; i, j = i+1, j-1 {
 		commits[i], commits[j] = commits[j], commits[i]
 	}
-	return commits, err
+	return commits, nil
 }
 
 func parseCommit(c *object.Commit) (Commit, error) {
-	_, firstLine, err := bufio.ScanLines([]byte(c.Message), true)
-	if err != nil {
-		return Commit{}, err
+	lines := strings.SplitN(c.Message, "\n", 4)
+	first := strings.TrimSpace(lines[0])
+
+	if m := prCommitRE.FindStringSubmatch(first); m != nil {
+		pri, err := strconv.Atoi(m[2])
+		return Commit{title: m[1], pr: pri, gc: c}, err
 	}
-	first := string(firstLine)
-	m := prCommitRE.FindStringSubmatch(first)
-	if m == nil {
-		return Commit{}, fmt.Errorf("could not parse format of commit message: %s", c.Message)
+
+	if m := mergeCommitRE.FindStringSubmatch(first); m != nil {
+		pri, err := strconv.Atoi(m[1])
+		if err != nil {
+			return Commit{}, err
+		}
+		title := first
+		if len(lines) >= 3 {
+			if t := strings.TrimSpace(lines[2]); t != "" {
+				title = t
+			}
+		}
+		return Commit{title: title, pr: pri, gc: c}, nil
 	}
-	pri, err := strconv.Atoi(m[2])
-	return Commit{
-		title: m[1],
-		pr:    pri,
-		gc:    c,
-	}, err
+
+	return Commit{}, fmt.Errorf("could not parse format of commit message: %s", c.Message)
 }
 
 var errNoChangelogFragment = errors.New("no changelog fragment found")

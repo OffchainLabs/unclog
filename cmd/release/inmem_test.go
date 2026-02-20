@@ -57,6 +57,66 @@ func commitAddTag(t *testing.T, repo *git.Repository, fp string, prNum int, ctim
 	}
 }
 
+func copyFileToRepoMerge(t *testing.T, repo *git.Repository, fname string, ctime time.Time, prNum int, prTitle string, tag string) {
+	tdp := path.Join("testdata", fname)
+	clp := path.Join("changelog", fname)
+	fh, err := os.Open(tdp)
+	requireNoError(t, err)
+	defer fh.Close()
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	outfh, err := tree.Filesystem.Create(clp)
+	requireNoError(t, err)
+	defer outfh.Close()
+	_, err = io.Copy(outfh, fh)
+	requireNoError(t, err)
+	commitMergeTag(t, repo, clp, prNum, prTitle, ctime, tag)
+}
+
+func commitMergeTag(t *testing.T, repo *git.Repository, fp string, prNum int, prTitle string, ctime time.Time, tag string) {
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	_, err = tree.Add(fp)
+	requireNoError(t, err)
+
+	headRef, err := repo.Head()
+	requireNoError(t, err)
+	mainParent := headRef.Hash()
+
+	branchMsg := fmt.Sprintf("%s (#%d)", prTitle, prNum)
+	branchOpts := commitOpts(ctime.Add(-time.Second))
+	branchHash, err := tree.Commit(branchMsg, branchOpts)
+	requireNoError(t, err)
+
+	branchCommit, err := repo.CommitObject(branchHash)
+	requireNoError(t, err)
+
+	mergeMsg := fmt.Sprintf("Merge pull request #%d from org/branch\n\n%s", prNum, prTitle)
+	sig := object.Signature{Name: "test", Email: "a@b.c", When: ctime}
+	mergeObj := object.Commit{
+		Author:       sig,
+		Committer:    sig,
+		Message:      mergeMsg,
+		TreeHash:     branchCommit.TreeHash,
+		ParentHashes: []plumbing.Hash{mainParent, branchHash},
+	}
+
+	eo := repo.Storer.NewEncodedObject()
+	err = mergeObj.Encode(eo)
+	requireNoError(t, err)
+	mergeHash, err := repo.Storer.SetEncodedObject(eo)
+	requireNoError(t, err)
+
+	newRef := plumbing.NewHashReference(plumbing.Master, mergeHash)
+	err = repo.Storer.SetReference(newRef)
+	requireNoError(t, err)
+
+	if tag != "" {
+		_, err = repo.CreateTag(tag, mergeHash, nil)
+		requireNoError(t, err)
+	}
+}
+
 // deleteFileFromRepo simulates a PR which cleanly reverted another PR while using a changelog fragment in the "ignored" section.
 func deleteFileFromRepo(t *testing.T, repo *git.Repository, fname string, ctime time.Time, prNum int, tag string) {
 	clp := path.Join("changelog", fname)
@@ -215,6 +275,39 @@ func TestCleanupPreservesConfigFile(t *testing.T) {
 
 	if _, err := tree.Filesystem.Open(configPath); err != nil {
 		t.Fatalf("expected config file to remain after cleanup: %v", err)
+	}
+}
+
+func TestMergeCommits(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	prNum++
+	copyFileToRepoMerge(t, repo, "example-single.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "Add single feature", "")
+	prNum++
+	copyFileToRepoMerge(t, repo, "example-multi.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "Add multi feature", "")
+	var last plumbing.Hash
+	_, err := repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+	merged, err := changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(merged, "### Fixed") {
+		t.Error("expected merged output to contain '### Fixed'")
+	}
+	if !strings.Contains(merged, "### Security") {
+		t.Error("expected merged output to contain '### Security'")
+	}
+	if !strings.Contains(merged, "Example of a single changelog entry") {
+		t.Error("expected merged output to contain single example entry")
+	}
+	if !strings.Contains(merged, "A bug was fixed") {
+		t.Error("expected merged output to contain multi example entry")
+	}
+	if !strings.Contains(merged, "/pull/1)") {
+		t.Error("expected merged output to contain PR link for #1")
+	}
+	if !strings.Contains(merged, "/pull/2)") {
+		t.Error("expected merged output to contain PR link for #2")
 	}
 }
 
