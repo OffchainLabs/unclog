@@ -59,6 +59,7 @@ type Config struct {
 	Repository   *git.Repository
 	ChangesDir   string
 	Tag          string
+	PreviousTag  string
 	PreviousPath string
 	Previous     Previous
 	RepoConfig   RepoConfig
@@ -249,6 +250,9 @@ func Release(ctx context.Context, cfg *Config) (string, error) {
 		return "", err
 	}
 	cfg.Previous = prev
+	if cfg.PreviousTag != "" {
+		cfg.Previous.Version = cfg.PreviousTag
+	}
 
 	if len(cfg.Sections) == 0 {
 		fileCfg, err := LoadConfig(cfg.RepoPath)

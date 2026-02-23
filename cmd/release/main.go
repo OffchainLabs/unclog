@@ -29,6 +29,7 @@ func parseArgs(args []string) (c *changelog.Config, err error) {
 	flags.StringVar(&c.RepoPath, "repo", "", "Path to the git repository")
 	flags.StringVar(&c.ChangesDir, "changelog-dir", "changelog", "Path to the directory containing changelog fragments for each commit")
 	flags.StringVar(&c.Tag, "tag", "", "New release tag (must already exist in repo)")
+	flags.StringVar(&c.PreviousTag, "prev-tag", "", "Previous release tag to diff from (overrides version parsed from changelog)")
 	flags.StringVar(&c.PreviousPath, "prev", "CHANGELOG.md", "Path to current changelog in the repo. This will be pulled from HEAD")
 	flags.StringVar(&c.OutputPath, "output", "", "Path to file where merged output will be written (relative to the -repo flag). Defaults to the value of the -prev flag")
 	flags.BoolVar(&c.Cleanup, "cleanup", false, "Remove the changelog fragment files after generating the changelog")
