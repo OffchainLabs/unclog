@@ -42,6 +42,10 @@ func (c Commit) prLink(repo *RepoConfig) string {
 	return "[[PR]](" + repo.PrURL(c.pr) + ")"
 }
 
+func (c Commit) commitLink(repo *RepoConfig) string {
+	return "[[commit]](" + repo.CommitURL(c.Id()) + ")"
+}
+
 func tagTimestamp(r *git.Repository, tag string) (time.Time, error) {
 	t, err := r.Tag(tag)
 	if err != nil {

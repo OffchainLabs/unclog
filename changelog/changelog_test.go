@@ -22,6 +22,24 @@ func TestParseBulletOverride(t *testing.T) {
 	}
 }
 
+func TestParseBulletCommitOverride(t *testing.T) {
+	// A bullet that already carries a commit link must be left untouched.
+	line := "- added override [[commit]](https://github.com/OffchainLabs/nitro/commit/abc123)"
+	res := parseBullet(line, "NOPE")
+	if line != res {
+		t.Error("parseBullet did not recognize the existing commit link")
+	}
+}
+
+func TestCommitURL(t *testing.T) {
+	repo := &RepoConfig{Owner: "OffchainLabs", Repo: "nitro"}
+	got := repo.CommitURL("abc123")
+	want := "https://github.com/OffchainLabs/nitro/commit/abc123"
+	if got != want {
+		t.Errorf("CommitURL = %q, want %q", got, want)
+	}
+}
+
 func TestSectionRe(t *testing.T) {
 	cases := []struct {
 		value string
