@@ -23,7 +23,7 @@ func TestParseBulletOverride(t *testing.T) {
 }
 
 func TestParseBulletCommitOverride(t *testing.T) {
-	// A bullet that already carries a commit link must be left untouched.
+	// Re-runs must not append a second link to a bullet that already has one.
 	line := "- added override [[commit]](https://github.com/OffchainLabs/nitro/commit/abc123)"
 	res := parseBullet(line, "NOPE")
 	if line != res {
