@@ -49,6 +49,10 @@ func (c *RepoConfig) PrURL(pr int) string {
 	return "https://github.com/" + c.Owner + "/" + c.Repo + "/pull/" + strconv.Itoa(pr)
 }
 
+func (c *RepoConfig) CommitURL(hash string) string {
+	return "https://github.com/" + c.Owner + "/" + c.Repo + "/commit/" + hash
+}
+
 // UnclogConfig represents the structure of the .unclog.yaml file
 type UnclogConfig struct {
 	Sections []string `yaml:"sections"`
@@ -64,6 +68,7 @@ type Config struct {
 	Previous     Previous
 	RepoConfig   RepoConfig
 	Cleanup      bool
+	UseCommit    bool
 	Branch       string
 	ReleaseTime  time.Time
 	OutputPath   string
@@ -123,11 +128,14 @@ func NewPreviousChangelog(r io.Reader) (Previous, error) {
 // Each commit's changelog file can have entries in different sections, indicated by
 // the same section headers as the final changelog.
 // Merge all changelog bullet points into their respective sections.
-func mergeEntries(fragments []Fragment, repo *RepoConfig) map[string][]string {
+func mergeEntries(fragments []Fragment, repo *RepoConfig, useCommit bool) map[string][]string {
 	sections := make(map[string][]string)
 	for _, f := range fragments {
-		pr := f.Commit.prLink(repo)
-		csecs := ParseFragment(f.Lines, pr)
+		link := f.Commit.prLink(repo)
+		if useCommit {
+			link = f.Commit.commitLink(repo)
+		}
+		csecs := ParseFragment(f.Lines, link)
 		for k, v := range csecs {
 			sections[k] = append(sections[k], v...)
 		}
@@ -274,7 +282,7 @@ func Release(ctx context.Context, cfg *Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sections := mergeEntries(fragments, &cfg.RepoConfig)
+	sections := mergeEntries(fragments, &cfg.RepoConfig, cfg.UseCommit)
 	if cfg.Cleanup {
 		if err := cleanupFragments(cfg, fragments); err != nil {
 			return "", err
@@ -321,14 +329,14 @@ func parseSection(line string) string {
 	return sec[1]
 }
 
-var prLinkRE = regexp.MustCompile(`\[\[PR\]\]\(https:\/\/[^\)]+\)`)
+var bulletLinkRE = regexp.MustCompile(`\[\[(PR|commit)\]\]\(https:\/\/[^\)]+\)`)
 
 func parseBullet(line string, pr string) string {
 	trimmed := strings.TrimLeft(line, " ")
 	if !strings.HasPrefix(trimmed, "- ") {
 		return ""
 	}
-	if prLinkRE.Match([]byte(trimmed)) {
+	if bulletLinkRE.Match([]byte(trimmed)) {
 		return line
 	}
 	return strings.TrimRight(line, " .") + ". " + pr

@@ -57,7 +57,7 @@ func commitAddTag(t *testing.T, repo *git.Repository, fp string, prNum int, ctim
 	}
 }
 
-func copyFileToRepoMerge(t *testing.T, repo *git.Repository, fname string, ctime time.Time, prNum int, prTitle string, tag string) {
+func copyFileToRepoMerge(t *testing.T, repo *git.Repository, fname string, ctime time.Time, prNum int, prTitle string, tag string) plumbing.Hash {
 	tdp := path.Join("testdata", fname)
 	clp := path.Join("changelog", fname)
 	fh, err := os.Open(tdp)
@@ -70,10 +70,10 @@ func copyFileToRepoMerge(t *testing.T, repo *git.Repository, fname string, ctime
 	defer outfh.Close()
 	_, err = io.Copy(outfh, fh)
 	requireNoError(t, err)
-	commitMergeTag(t, repo, clp, prNum, prTitle, ctime, tag)
+	return commitMergeTag(t, repo, clp, prNum, prTitle, ctime, tag)
 }
 
-func commitMergeTag(t *testing.T, repo *git.Repository, fp string, prNum int, prTitle string, ctime time.Time, tag string) {
+func commitMergeTag(t *testing.T, repo *git.Repository, fp string, prNum int, prTitle string, ctime time.Time, tag string) plumbing.Hash {
 	tree, err := repo.Worktree()
 	requireNoError(t, err)
 	_, err = tree.Add(fp)
@@ -115,6 +115,7 @@ func commitMergeTag(t *testing.T, repo *git.Repository, fp string, prNum int, pr
 		_, err = repo.CreateTag(tag, mergeHash, nil)
 		requireNoError(t, err)
 	}
+	return mergeHash
 }
 
 // deleteFileFromRepo simulates a PR which cleanly reverted another PR while using a changelog fragment in the "ignored" section.
@@ -308,6 +309,41 @@ func TestMergeCommits(t *testing.T) {
 	}
 	if !strings.Contains(merged, "/pull/2)") {
 		t.Error("expected merged output to contain PR link for #2")
+	}
+}
+
+// In the non-squash workflow each PR is a merge commit, so UseCommit should link to
+// that merge commit's hash rather than the PR.
+func TestMergeCommitsUseCommit(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	cfg.UseCommit = true
+	prNum++
+	h1 := copyFileToRepoMerge(t, repo, "example-single.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "Add single feature", "")
+	prNum++
+	h2 := copyFileToRepoMerge(t, repo, "example-multi.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "Add multi feature", "")
+	var last plumbing.Hash
+	_, err := repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+	merged, err := changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The carried-over previous body keeps its old PR links, so only assert on the
+	// newly generated section above it.
+	generated := merged
+	if idx := strings.Index(merged, "## ["+cfg.Previous.Version+"]"); idx >= 0 {
+		generated = merged[:idx]
+	}
+
+	for _, h := range []plumbing.Hash{h1, h2} {
+		want := fmt.Sprintf("[[commit]](https://github.com/OffchainLabs/prysm/commit/%s)", h.String())
+		if !strings.Contains(generated, want) {
+			t.Errorf("expected generated section to contain commit link %q", want)
+		}
+	}
+	if strings.Contains(generated, "/pull/") {
+		t.Error("expected no PR links in commit mode, but found one in the generated section")
 	}
 }
 

@@ -33,6 +33,7 @@ func parseArgs(args []string) (c *changelog.Config, err error) {
 	flags.StringVar(&c.PreviousPath, "prev", "CHANGELOG.md", "Path to current changelog in the repo. This will be pulled from HEAD")
 	flags.StringVar(&c.OutputPath, "output", "", "Path to file where merged output will be written (relative to the -repo flag). Defaults to the value of the -prev flag")
 	flags.BoolVar(&c.Cleanup, "cleanup", false, "Remove the changelog fragment files after generating the changelog")
+	flags.BoolVar(&c.UseCommit, "use-commit", false, "Link changelog bullets to the commit hash (e.g. on the public repo) instead of the PR")
 	flags.Parse(args)
 	if c.RepoPath == "" {
 		wd, err := os.Getwd()
