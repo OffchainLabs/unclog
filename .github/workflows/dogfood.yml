@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: build-unclog
         id: unclog-build
@@ -20,13 +20,13 @@ jobs:
 
       - name: Download changelog check binary
         id: unclog-download
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806
         with:
           name: ${{ steps.unclog-build.outputs.artifact-name }}
 
       - name: Get new changelog files
         id: new-changelog-files
-        uses: tj-actions/changed-files@v45
+        uses: OffchainLabs/gh-action-changed-files@9200e69727eb73eb060652b19946b8a2fdfb654b # v4.0.8
         with:
           files: |
             log/**.md
