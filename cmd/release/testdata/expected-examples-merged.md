@@ -11,6 +11,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Example of a single changelog entry. [[PR]](https://github.com/OffchainLabs/prysm/pull/1)
 - A bug was fixed. [[PR]](https://github.com/OffchainLabs/prysm/pull/2)
 - Another bug was fixed. [[PR]](https://github.com/OffchainLabs/prysm/pull/2)
+- This is a fix, but it might be deleted later!. [[PR]](https://github.com/OffchainLabs/prysm/pull/3)
 
 ### Security
 
