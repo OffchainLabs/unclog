@@ -118,7 +118,9 @@ func commitMergeTag(t *testing.T, repo *git.Repository, fp string, prNum int, pr
 	return mergeHash
 }
 
-// deleteFileFromRepo simulates a PR which cleanly reverted another PR while using a changelog fragment in the "ignored" section.
+// deleteFileFromRepo simulates a PR which cleanly reverted another PR while using a changelog fragment
+// in the "ignored" section. The reverted PR's entry stays in the release (fragments are read as of the
+// commit that introduced them), so the revert shows up only through this PR's own fragment.
 func deleteFileFromRepo(t *testing.T, repo *git.Repository, fname string, ctime time.Time, prNum int, tag string) {
 	clp := path.Join("changelog", fname)
 	tree, err := repo.Worktree()
@@ -344,6 +346,212 @@ func TestMergeCommitsUseCommit(t *testing.T) {
 	}
 	if strings.Contains(generated, "/pull/") {
 		t.Error("expected no PR links in commit mode, but found one in the generated section")
+	}
+}
+
+// Commits without a PR reference (direct pushes, branch merges) must not fail the
+// release; fragments found in them link to the commit hash instead of a PR, and a
+// merge commit carrying several fragments contributes all of them.
+func TestNonPRCommits(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+
+	copyIntoTree := func(fname string) {
+		clp := path.Join("changelog", fname)
+		fh, err := os.Open(path.Join("testdata", fname))
+		requireNoError(t, err)
+		defer fh.Close()
+		outfh, err := tree.Filesystem.Create(clp)
+		requireNoError(t, err)
+		defer outfh.Close()
+		_, err = io.Copy(outfh, fh)
+		requireNoError(t, err)
+		_, err = tree.Add(clp)
+		requireNoError(t, err)
+	}
+
+	// A commit pushed directly to master, carrying a changelog fragment.
+	prNum++
+	copyIntoTree("example-single.md")
+	direct, err := tree.Commit("Install safe-smart-account deps with npm ci, not npm install",
+		commitOpts(prevTime.Add(time.Duration(prNum)*time.Minute)))
+	requireNoError(t, err)
+
+	// A merge of master into a feature branch that landed on the first-parent chain,
+	// bringing in fragments from multiple PRs at once.
+	prNum++
+	copyIntoTree("example-multi.md")
+	copyIntoTree("example-single-deleted.md")
+	merge, err := tree.Commit("Merge branch 'master' of github.com:OffchainLabs/nitro-private into npm-ci-safe-smart-account",
+		commitOpts(prevTime.Add(time.Duration(prNum)*time.Minute)))
+	requireNoError(t, err)
+
+	var last plumbing.Hash
+	_, err = repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+	merged, err := changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	generated := merged
+	if idx := strings.Index(merged, "## ["+cfg.Previous.Version+"]"); idx >= 0 {
+		generated = merged[:idx]
+	}
+	for _, text := range []string{
+		"Example of a single changelog entry",
+		"A bug was fixed",
+		"This is a fix, but it might be deleted later!",
+	} {
+		if !strings.Contains(generated, text) {
+			t.Errorf("expected generated section to contain %q", text)
+		}
+	}
+	for _, h := range []plumbing.Hash{direct, merge} {
+		want := fmt.Sprintf("[[commit]](https://github.com/OffchainLabs/prysm/commit/%s)", h.String())
+		if !strings.Contains(generated, want) {
+			t.Errorf("expected generated section to contain commit link %q", want)
+		}
+	}
+	if strings.Contains(generated, "/pull/") {
+		t.Error("expected no PR links for non-PR commits in the generated section")
+	}
+}
+
+// A fragment is rendered with its content as of the commit that introduced it; later
+// edits to the fragment file don't affect the entry.
+func TestFragmentEditedAfterMerge(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	prNum++
+	introPR := prNum
+	copyFileToRepoMerge(t, repo, "example-single.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "Add single feature", "")
+
+	// A later PR rewrites the fragment; the entry keeps its content at point of merge.
+	prNum++
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	clp := path.Join("changelog", "example-single.md")
+	fh, err := tree.Filesystem.Create(clp)
+	requireNoError(t, err)
+	_, err = fh.Write([]byte("### Fixed\n\n- Rewritten entry text\n"))
+	requireNoError(t, err)
+	requireNoError(t, fh.Close())
+	commitAddTag(t, repo, clp, prNum, prevTime.Add(time.Duration(prNum)*time.Minute), "")
+
+	var last plumbing.Hash
+	_, err = repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+	merged, err := changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	generated := merged
+	if idx := strings.Index(merged, "## ["+cfg.Previous.Version+"]"); idx >= 0 {
+		generated = merged[:idx]
+	}
+	want := fmt.Sprintf("- Example of a single changelog entry. [[PR]](https://github.com/OffchainLabs/prysm/pull/%d)", introPR)
+	if !strings.Contains(generated, want) {
+		t.Errorf("expected generated section to contain the entry as merged, %q", want)
+	}
+	if strings.Contains(generated, "Rewritten entry text") {
+		t.Error("expected the post-merge edit to be ignored")
+	}
+}
+
+// A fragment edited on the PR branch before merging is rendered with its content at
+// the point of merge, not as first added.
+func TestFragmentEditedDuringPR(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	prNum++
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	clp := path.Join("changelog", "example-single.md")
+
+	write := func(content, msg string, when time.Time) plumbing.Hash {
+		fh, err := tree.Filesystem.Create(clp)
+		requireNoError(t, err)
+		_, err = fh.Write([]byte(content))
+		requireNoError(t, err)
+		requireNoError(t, fh.Close())
+		_, err = tree.Add(clp)
+		requireNoError(t, err)
+		h, err := tree.Commit(msg, commitOpts(when))
+		requireNoError(t, err)
+		return h
+	}
+
+	headRef, err := repo.Head()
+	requireNoError(t, err)
+	mainParent := headRef.Hash()
+
+	when := prevTime.Add(time.Duration(prNum) * time.Minute)
+	write("### Fixed\n\n- First draft of the entry\n", "add fragment", when.Add(-2*time.Second))
+	branchTip := write("### Fixed\n\n- Final entry text after review\n", "address review feedback", when.Add(-time.Second))
+
+	branchCommit, err := repo.CommitObject(branchTip)
+	requireNoError(t, err)
+	sig := object.Signature{Name: "test", Email: "a@b.c", When: when}
+	mergeObj := object.Commit{
+		Author:       sig,
+		Committer:    sig,
+		Message:      fmt.Sprintf("Merge pull request #%d from org/branch\n\nAdd single feature", prNum),
+		TreeHash:     branchCommit.TreeHash,
+		ParentHashes: []plumbing.Hash{mainParent, branchTip},
+	}
+	eo := repo.Storer.NewEncodedObject()
+	requireNoError(t, mergeObj.Encode(eo))
+	mergeHash, err := repo.Storer.SetEncodedObject(eo)
+	requireNoError(t, err)
+	requireNoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.Master, mergeHash)))
+
+	var last plumbing.Hash
+	_, err = repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+	merged, err := changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := fmt.Sprintf("- Final entry text after review. [[PR]](https://github.com/OffchainLabs/prysm/pull/%d)", prNum)
+	if !strings.Contains(merged, want) {
+		t.Errorf("expected the fragment content at the point of merge, %q", want)
+	}
+	if strings.Contains(merged, "First draft of the entry") {
+		t.Error("expected pre-merge draft content to be ignored")
+	}
+}
+
+// A fragment deleted after its PR merged, e.g. by release cleanup, still contributes
+// its entry with the content it had at point of merge.
+func TestFragmentDeletedBeforeRelease(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	prNum++
+	introPR := prNum
+	copyFileToRepoMerge(t, repo, "example-single.md", prevTime.Add(time.Duration(prNum)*time.Minute), prNum, "Add single feature", "")
+
+	prNum++
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	clp := path.Join("changelog", "example-single.md")
+	requireNoError(t, tree.Filesystem.Remove(clp))
+	_, err = tree.Remove(clp)
+	requireNoError(t, err)
+	_, err = tree.Commit("update changelog fragment", commitOpts(prevTime.Add(time.Duration(prNum)*time.Minute)))
+	requireNoError(t, err)
+
+	var last plumbing.Hash
+	_, err = repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+	merged, err := changelog.Release(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := fmt.Sprintf("- Example of a single changelog entry. [[PR]](https://github.com/OffchainLabs/prysm/pull/%d)", introPR)
+	if !strings.Contains(merged, want) {
+		t.Errorf("expected entry from cleaned-up fragment to remain in the release, %q", want)
 	}
 }
 

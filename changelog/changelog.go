@@ -10,14 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"gopkg.in/yaml.v3"
 )
 
@@ -132,7 +131,7 @@ func mergeEntries(fragments []Fragment, repo *RepoConfig, useCommit bool) map[st
 	sections := make(map[string][]string)
 	for _, f := range fragments {
 		link := f.Commit.prLink(repo)
-		if useCommit {
+		if useCommit || f.Commit.pr == 0 {
 			link = f.Commit.commitLink(repo)
 		}
 		csecs := ParseFragment(f.Lines, link)
@@ -159,15 +158,19 @@ func mergeEntries(fragments []Fragment, repo *RepoConfig, useCommit bool) map[st
 	*/
 }
 
-// Finds all fragments in a list of commits, except for fragments that are deleted by child commits.
+// Finds all fragments in a list of commits, using each fragment's content as of the
+// commit that introduced it. Later changes to the fragment file — edits, release
+// cleanup deletions, even revert deletions — don't affect the entry; if a fragment is
+// deleted and re-added within the range, the last commit to add it wins.
 func findFragments(dir string, commits []Commit) ([]Fragment, error) {
 	fragments := make([]Fragment, 0)
+	byPath := make(map[string]int)
 	for _, cm := range commits {
 		parent, err := cm.Parent()
 		if err != nil {
 			return fragments, err
 		}
-		f, err := FindFragment(dir, parent, cm)
+		fs, err := FindFragments(dir, parent, cm)
 		if err != nil {
 			if errors.Is(err, errNoChangelogFragment) {
 				log.Printf("no changelog fragment found for commit %s", cm.Id())
@@ -175,59 +178,16 @@ func findFragments(dir string, commits []Commit) ([]Fragment, error) {
 			}
 			return nil, err
 		}
-		fragments = append(fragments, f)
-	}
-
-	filtered := make([]Fragment, 0, len(fragments))
-	deleted := make(map[string]interface{})
-	for i := len(commits) - 1; i >= 0; i-- {
-		files, err := findDeletedFiles(dir, commits[i])
-		if err != nil {
-			return nil, err
-		}
-		for _, f := range files {
-			deleted[filepath.Base(f)] = true
+		for _, f := range fs {
+			if i, ok := byPath[f.Path]; ok {
+				fragments[i] = f
+				continue
+			}
+			byPath[f.Path] = len(fragments)
+			fragments = append(fragments, f)
 		}
 	}
-	for _, cf := range fragments {
-		if deleted[cf.Path] == nil {
-			filtered = append(filtered, cf)
-		}
-	}
-
-	return filtered, nil
-}
-
-// findDeletedFiles returns a list of filepaths deleted in the given directory.
-func findDeletedFiles(dir string, c Commit) ([]string, error) {
-	p, err := c.Parent()
-	if err != nil {
-		return nil, err
-	}
-	pt, err := p.gc.Tree()
-	if err != nil {
-		return nil, err
-	}
-
-	ct, err := c.gc.Tree()
-	if err != nil {
-		return nil, err
-	}
-
-	changes, err := object.DiffTreeWithOptions(context.Background(), pt, ct, object.DefaultDiffTreeOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	deleted := make([]string, 0)
-	for _, chg := range changes {
-		a, err := chg.Action()
-		if err == nil && a == merkletrie.Delete {
-			deleted = append(deleted, chg.From.Name)
-		}
-	}
-
-	return deleted, nil
+	return fragments, nil
 }
 
 // LoadConfig attempts to read the .unclog.yaml file from the changelog directory.
@@ -283,6 +243,12 @@ func Release(ctx context.Context, cfg *Config) (string, error) {
 		return "", err
 	}
 	sections := mergeEntries(fragments, &cfg.RepoConfig, cfg.UseCommit)
+	for name, bullets := range sections {
+		if name == sectionIgnored || slices.Contains(activeSections, name) {
+			continue
+		}
+		log.Printf("dropping %d bullet(s) under unrecognized section %q: %s", len(bullets), name, strings.Join(bullets, "; "))
+	}
 	if cfg.Cleanup {
 		if err := cleanupFragments(cfg, fragments); err != nil {
 			return "", err
