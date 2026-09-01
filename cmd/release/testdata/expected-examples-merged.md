@@ -4,17 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
-## [v1.0.1](https://github.com/prysmaticlabs/prysm/compare/v1.0.0...v1.0.1) - 2021-11-11
+## [v1.0.1](https://github.com/OffchainLabs/prysm/compare/v1.0.0...v1.0.1) - 2021-11-11
 
 ### Fixed
 
-- Example of a single changelog entry. [[PR]](https://github.com/prysmaticlabs/prysm/pull/1)
-- A bug was fixed. [[PR]](https://github.com/prysmaticlabs/prysm/pull/2)
-- Another bug was fixed. [[PR]](https://github.com/prysmaticlabs/prysm/pull/2)
+- Example of a single changelog entry. [[PR]](https://github.com/OffchainLabs/prysm/pull/1)
+- A bug was fixed. [[PR]](https://github.com/OffchainLabs/prysm/pull/2)
+- Another bug was fixed. [[PR]](https://github.com/OffchainLabs/prysm/pull/2)
+- This is a fix, but it might be deleted later!. [[PR]](https://github.com/OffchainLabs/prysm/pull/3)
 
 ### Security
 
-- The bug fixes resolved a security issue. [[PR]](https://github.com/prysmaticlabs/prysm/pull/2)
+- The bug fixes resolved a security issue. [[PR]](https://github.com/OffchainLabs/prysm/pull/2)
 
 ## [v1.0.0](https://github.com/prysmaticlabs/prysm/compare/v5.1.2...v5.1.3) - 2024-12-04
 

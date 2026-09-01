@@ -149,7 +149,9 @@ func parseCommit(c *object.Commit) (Commit, error) {
 		return Commit{title: title, pr: pri, gc: c}, nil
 	}
 
-	return Commit{}, fmt.Errorf("could not parse format of commit message: %s", c.Message)
+	// Commits without a PR reference (direct pushes, branch merges) can still carry
+	// changelog fragments; they are linked by commit hash instead of PR number.
+	return Commit{title: first, gc: c}, nil
 }
 
 var errNoChangelogFragment = errors.New("no changelog fragment found")
@@ -180,39 +182,53 @@ func cleanupFragments(cfg *Config, fragments []Fragment) error {
 	return nil
 }
 
-func FindFragment(clDir string, parent, cm Commit) (Fragment, error) {
-	frag := Fragment{Commit: cm}
+// FindFragments returns all changelog fragments inserted by the commit relative to its parent.
+// A merge commit can carry fragments from several PRs at once, e.g. when a feature branch that
+// merged in the main branch later lands on the first-parent chain.
+func FindFragments(clDir string, parent, cm Commit) ([]Fragment, error) {
 	pt, err := parent.gc.Tree()
 	if err != nil {
-		return frag, err
+		return nil, err
 	}
 	t, err := cm.gc.Tree()
 	if err != nil {
-		return frag, err
+		return nil, err
 	}
 	changes, err := object.DiffTreeWithOptions(context.Background(), pt, t, object.DefaultDiffTreeOptions)
 	if err != nil {
-		return frag, err
+		return nil, err
 	}
+	var frags []Fragment
 	for _, ch := range changes {
 		from, to, err := ch.Files()
 		if err != nil {
-			return frag, err
+			return nil, err
 		}
 		// For insertions From is the zero value, and these are the only changes we care about.
 		if from != nil {
 			continue
 		}
-		if strings.HasPrefix(ch.To.Name, clDir) {
-			if path.Ext(ch.To.Name) != ".md" {
-				continue
-			}
-			frag.Lines, err = to.Lines()
-			frag.Path = to.Name
-			return frag, err
+		if !strings.HasPrefix(ch.To.Name, clDir) || path.Ext(ch.To.Name) != ".md" {
+			continue
 		}
+		lines, err := to.Lines()
+		if err != nil {
+			return nil, err
+		}
+		frags = append(frags, Fragment{Lines: lines, Path: to.Name, Commit: cm})
 	}
-	return frag, errNoChangelogFragment
+	if len(frags) == 0 {
+		return nil, errNoChangelogFragment
+	}
+	return frags, nil
+}
+
+func FindFragment(clDir string, parent, cm Commit) (Fragment, error) {
+	frags, err := FindFragments(clDir, parent, cm)
+	if err != nil {
+		return Fragment{Commit: cm}, err
+	}
+	return frags[0], nil
 }
 
 const maxBranchDepth = 60
