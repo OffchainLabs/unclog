@@ -2,6 +2,7 @@ package changelog
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -106,7 +107,11 @@ type Previous struct {
 // the new release changelog to assemble the final combined changelog.
 func NewPreviousChangelog(r io.Reader) (Previous, error) {
 	p := Previous{}
-	scn := bufio.NewScanner(r)
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return p, err
+	}
+	scn := bufio.NewScanner(bytes.NewReader(data))
 	for scn.Scan() {
 		line := scn.Text()
 		if p.Version != "" {
@@ -121,6 +126,11 @@ func NewPreviousChangelog(r io.Reader) (Previous, error) {
 	}
 	if p.Version == "" {
 		return p, fmt.Errorf("no version found")
+	}
+	// The scanner strips the final line terminator; keep the file's trailing
+	// newline so a release does not rewrite the last line of the changelog.
+	if bytes.HasSuffix(data, []byte("\n")) {
+		p.Body += "\n"
 	}
 	return p, nil
 }
@@ -342,24 +352,49 @@ func parseBullet(line string, pr string) string {
 	return strings.TrimRight(line, " .") + ". " + pr
 }
 
+// isBulletStart reports whether line starts a new list item.
+func isBulletStart(line string) bool {
+	return strings.HasPrefix(strings.TrimLeft(line, " "), "- ")
+}
+
+// ParseFragment groups the bullets of a fragment file by section. A bullet may wrap
+// onto following lines (indented or not, as Markdown allows); those continuation
+// lines are joined onto the bullet with single spaces. A blank line, a new bullet
+// or a section header ends the bullet.
 func ParseFragment(lines []string, pr string) map[string][]string {
 	fragments := make(map[string][]string)
 	var current string
+	var bullet []string
+	flush := func() {
+		if len(bullet) == 0 {
+			return
+		}
+		if b := parseBullet(strings.Join(bullet, " "), pr); b != "" {
+			fragments[current] = append(fragments[current], b)
+		}
+		bullet = nil
+	}
 	for _, line := range lines {
 		section := parseSection(line)
 		if section != "" {
+			flush()
 			current = section
 			continue
 		}
 		if current == "" {
 			continue
 		}
-		bullet := parseBullet(line, pr)
-		if bullet == "" {
-			continue
+		switch {
+		case isBulletStart(line):
+			flush()
+			bullet = []string{strings.TrimRight(line, " ")}
+		case strings.TrimSpace(line) == "":
+			flush()
+		case len(bullet) > 0:
+			bullet = append(bullet, strings.TrimSpace(line))
 		}
-		fragments[current] = append(fragments[current], bullet)
 	}
+	flush()
 	return fragments
 }
 
