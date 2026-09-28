@@ -6,8 +6,8 @@ name: test
 on:
   push:
     branches: [ "main" ]
+  # Every pull request, whatever its base branch, so stacked PRs are tested too.
   pull_request:
-    branches: [ "main" ]
 
 permissions:
   contents: read
