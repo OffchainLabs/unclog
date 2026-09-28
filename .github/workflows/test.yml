@@ -1,0 +1,31 @@
+# Runs the Go test suite on every pull request and on pushes to main, so test
+# regressions are caught before merge (the dogfood workflow only builds the binary).
+
+name: test
+
+on:
+  push:
+    branches: [ "main" ]
+  # Every pull request, whatever its base branch, so stacked PRs are tested too.
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -count=1 ./...
