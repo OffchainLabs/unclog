@@ -180,24 +180,24 @@ func cleanupFragments(cfg *Config, fragments []Fragment) error {
 	return nil
 }
 
-func FindFragment(clDir string, parent, cm Commit) (Fragment, error) {
-	frag := Fragment{Commit: cm}
+func FindFragments(clDir string, parent, cm Commit) ([]Fragment, error) {
+	fragments := make([]Fragment, 0)
 	pt, err := parent.gc.Tree()
 	if err != nil {
-		return frag, err
+		return fragments, err
 	}
 	t, err := cm.gc.Tree()
 	if err != nil {
-		return frag, err
+		return fragments, err
 	}
 	changes, err := object.DiffTreeWithOptions(context.Background(), pt, t, object.DefaultDiffTreeOptions)
 	if err != nil {
-		return frag, err
+		return fragments, err
 	}
 	for _, ch := range changes {
 		from, to, err := ch.Files()
 		if err != nil {
-			return frag, err
+			return fragments, err
 		}
 		// For insertions From is the zero value, and these are the only changes we care about.
 		if from != nil {
@@ -207,12 +207,31 @@ func FindFragment(clDir string, parent, cm Commit) (Fragment, error) {
 			if path.Ext(ch.To.Name) != ".md" {
 				continue
 			}
-			frag.Lines, err = to.Lines()
-			frag.Path = to.Name
-			return frag, err
+			lines, err := to.Lines()
+			if err != nil {
+				return fragments, err
+			}
+			fragments = append(fragments, Fragment{
+				Lines:  lines,
+				Path:   to.Name,
+				Commit: cm,
+			})
 		}
 	}
-	return frag, errNoChangelogFragment
+	if len(fragments) == 0 {
+		return fragments, errNoChangelogFragment
+	}
+	return fragments, nil
+}
+
+// FindFragment returns the first changelog fragment added by a commit.
+// Deprecated: use FindFragments to retain every fragment from the commit.
+func FindFragment(clDir string, parent, cm Commit) (Fragment, error) {
+	fragments, err := FindFragments(clDir, parent, cm)
+	if err != nil {
+		return Fragment{}, err
+	}
+	return fragments[0], nil
 }
 
 const maxBranchDepth = 60

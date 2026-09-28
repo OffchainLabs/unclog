@@ -118,6 +118,33 @@ func commitMergeTag(t *testing.T, repo *git.Repository, fp string, prNum int, pr
 	return mergeHash
 }
 
+func copyFilesToRepo(t *testing.T, repo *git.Repository, fnames []string, ctime time.Time, prNum int, tag string) {
+	tree, err := repo.Worktree()
+	requireNoError(t, err)
+	for _, fname := range fnames {
+		src, err := os.Open(path.Join("testdata", fname))
+		requireNoError(t, err)
+
+		dst, err := tree.Filesystem.Create(path.Join("changelog", fname))
+		requireNoError(t, err)
+		_, err = io.Copy(dst, src)
+		requireNoError(t, err)
+		requireNoError(t, src.Close())
+		requireNoError(t, dst.Close())
+
+		_, err = tree.Add(path.Join("changelog", fname))
+		requireNoError(t, err)
+	}
+
+	msg := fmt.Sprintf("%s (#%d)", strings.Join(fnames, ", "), prNum)
+	ct, err := tree.Commit(msg, commitOpts(ctime))
+	requireNoError(t, err)
+	if tag != "" {
+		_, err = repo.CreateTag(tag, ct, nil)
+		requireNoError(t, err)
+	}
+}
+
 // deleteFileFromRepo simulates a PR which cleanly reverted another PR while using a changelog fragment in the "ignored" section.
 func deleteFileFromRepo(t *testing.T, repo *git.Repository, fname string, ctime time.Time, prNum int, tag string) {
 	clp := path.Join("changelog", fname)
@@ -127,6 +154,39 @@ func deleteFileFromRepo(t *testing.T, repo *git.Repository, fname string, ctime 
 	_, err = tree.Remove(clp)
 	requireNoError(t, err)
 	copyFileToRepo(t, repo, "ignored.md", ctime, prNum, tag)
+}
+
+func TestMultipleFragmentsInOneCommit(t *testing.T) {
+	repo, cfg, prevTime, prNum := setupTestRepo(t)
+	prNum++
+	copyFilesToRepo(
+		t,
+		repo,
+		[]string{"example-single.md", "example-multi.md"},
+		prevTime.Add(time.Duration(prNum)*time.Minute),
+		prNum,
+		"",
+	)
+
+	var last plumbing.Hash
+	_, err := repo.CreateTag(cfg.Tag, last, nil)
+	requireNoError(t, err)
+	merged, err := changelog.Release(context.Background(), cfg)
+	requireNoError(t, err)
+
+	for _, entry := range []string{
+		"Example of a single changelog entry",
+		"A bug was fixed",
+		"Another bug was fixed",
+		"The bug fixes resolved a security issue",
+	} {
+		if !strings.Contains(merged, entry) {
+			t.Errorf("expected merged output to contain %q", entry)
+		}
+	}
+	if got := strings.Count(merged, "/pull/1)"); got != 4 {
+		t.Errorf("expected four entries linked to PR #1, got %d", got)
+	}
 }
 
 func TestExamples(t *testing.T) {

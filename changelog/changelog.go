@@ -177,7 +177,7 @@ func findFragments(dir string, commits []Commit) ([]Fragment, error) {
 		if err != nil {
 			return fragments, err
 		}
-		f, err := FindFragment(dir, parent, cm)
+		fs, err := FindFragments(dir, parent, cm)
 		if err != nil {
 			if errors.Is(err, errNoChangelogFragment) {
 				log.Printf("no changelog fragment found for commit %s", cm.Id())
@@ -185,7 +185,7 @@ func findFragments(dir string, commits []Commit) ([]Fragment, error) {
 			}
 			return nil, err
 		}
-		fragments = append(fragments, f)
+		fragments = append(fragments, fs...)
 	}
 
 	filtered := make([]Fragment, 0, len(fragments))
